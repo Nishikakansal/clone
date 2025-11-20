@@ -27,7 +27,8 @@ import {
   Building,
   Mail,
   FileText,
-  Building2
+  Building2,
+  Stethoscope
 } from 'lucide-react';
 import { toast } from 'sonner';
 
