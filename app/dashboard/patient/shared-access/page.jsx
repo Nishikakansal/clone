@@ -371,13 +371,147 @@ export default function SharedAccess() {
               </TabsList>
 
               <TabsContent value="hospital" className="space-y-4">
-                <HospitalDoctorSelector
-                  onDoctorSelected={() => {
-                    setShowShareDialog(false);
-                    fetchSharedAccess();
-                  }}
-                  onCancel={() => setShowShareDialog(false)}
-                />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hospital">Select Hospital</Label>
+                    <Select
+                      value={selectedHospital}
+                      onValueChange={handleHospitalChange}
+                      disabled={loadingHospitals}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingHospitals ? "Loading hospitals..." : "Choose a hospital"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hospitals.map((hospital) => (
+                          <SelectItem key={hospital._id} value={hospital._id}>
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4" />
+                              <span>{hospital.name}</span>
+                              {hospital.address?.city && (
+                                <span className="text-xs text-muted-foreground">({hospital.address.city})</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedHospital && (
+                    <div className="space-y-2">
+                      <Label htmlFor="doctor">Select Doctor</Label>
+                      <Select
+                        value={selectedDoctor}
+                        onValueChange={setSelectedDoctor}
+                        disabled={loadingDoctors || doctors.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingDoctors ? "Loading doctors..." : (doctors.length === 0 ? "No doctors available" : "Choose a doctor")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {doctors.map((doctor) => (
+                            <SelectItem key={doctor._id} value={doctor._id}>
+                              <div className="flex items-center gap-2">
+                                <Stethoscope className="h-4 w-4" />
+                                <span>Dr. {doctor.firstName} {doctor.lastName}</span>
+                                {doctor.specialization && (
+                                  <span className="text-xs text-muted-foreground">({doctor.specialization})</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedDoctor && (
+                        <div className="text-xs text-muted-foreground">
+                          <div className="mt-2 p-2 bg-muted rounded">
+                            {(() => {
+                              const doctor = doctors.find(d => d._id === selectedDoctor);
+                              return doctor ? (
+                                <>
+                                  <p><strong>Email:</strong> {doctor.email}</p>
+                                  <p><strong>License:</strong> {doctor.licenseNumber || 'N/A'}</p>
+                                </>
+                              ) : null;
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedDoctor && (
+                    <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <CardContent className="p-4">
+                        <p className="text-sm font-medium mb-4">Access Settings</p>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="accessLevel">Access Level</Label>
+                            <Select
+                              value={shareForm.accessLevel}
+                              onValueChange={(value) => setShareForm({ ...shareForm, accessLevel: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="read">Read Only</SelectItem>
+                                <SelectItem value="write">Read & Write</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="expiresIn">Access Duration</Label>
+                            <Select
+                              value={shareForm.expiresIn}
+                              onValueChange={(value) => setShareForm({ ...shareForm, expiresIn: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="7d">7 Days</SelectItem>
+                                <SelectItem value="30d">30 Days</SelectItem>
+                                <SelectItem value="90d">90 Days</SelectItem>
+                                <SelectItem value="1y">1 Year</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowShareDialog(false);
+                        setSelectedHospital('');
+                        setSelectedDoctor('');
+                        setDoctors([]);
+                      }}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleShareFromDropdown}
+                      disabled={!selectedDoctor || sharingFromDropdown}
+                      className="flex-1"
+                    >
+                      {sharingFromDropdown ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sharing...
+                        </>
+                      ) : (
+                        'Share Access'
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="email">
