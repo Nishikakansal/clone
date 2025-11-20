@@ -85,17 +85,23 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { doctorEmail, accessLevel, expiresIn, recordCategories } = body;
+    const { doctorId, doctorEmail, accessLevel, expiresIn, recordCategories } = body;
 
-    if (!doctorEmail) {
-      return Response.json({ error: 'Doctor email is required' }, { status: 400 });
+    if (!doctorId && !doctorEmail) {
+      return Response.json({ error: 'Doctor ID or email is required' }, { status: 400 });
     }
 
     await connectDB();
 
-    // Find the doctor by email
-    const doctor = await User.findOne({ email: doctorEmail, role: 'doctor' });
-    if (!doctor) {
+    // Find the doctor by ID or email
+    let doctor;
+    if (doctorId) {
+      doctor = await User.findById(doctorId);
+    } else {
+      doctor = await User.findOne({ email: doctorEmail, role: 'doctor' });
+    }
+
+    if (!doctor || doctor.role !== 'doctor') {
       return Response.json({ error: 'Doctor not found' }, { status: 404 });
     }
 
