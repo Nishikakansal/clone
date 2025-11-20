@@ -151,7 +151,7 @@ export default function PatientAccessRequests() {
     const matchesSearch = `${req.doctor.name} ${req.doctor.email} ${req.doctor.specialization}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || req.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
