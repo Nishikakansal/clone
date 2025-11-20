@@ -25,7 +25,7 @@ export async function PATCH(request, { params }) {
 
     // ⭐ FIXED — Correct body parsing
     const body = await request.json();
-    const { action, responseMessage } = body;
+    const { action, responseMessage, durationDays } = body;
 
     if (!["approve", "deny"].includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
