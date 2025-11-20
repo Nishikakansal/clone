@@ -40,6 +40,10 @@ export default function SharedAccess() {
   const [shareDialogTab, setShareDialogTab] = useState('hospital');
   const [searchTerm, setSearchTerm] = useState('');
   const [sharingAccess, setSharingAccess] = useState(false);
+  const [respondingToRequest, setRespondingToRequest] = useState(null);
+  const [durationDays, setDurationDays] = useState('30');
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [selectedRequestForApprove, setSelectedRequestForApprove] = useState(null);
 
   const [shareForm, setShareForm] = useState({
     doctorEmail: '',
