@@ -44,6 +44,8 @@ export default function SharedAccess() {
   const [durationDays, setDurationDays] = useState('30');
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [selectedRequestForApprove, setSelectedRequestForApprove] = useState(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [selectedAccessDetails, setSelectedAccessDetails] = useState(null);
 
   const [shareForm, setShareForm] = useState({
     doctorEmail: '',
