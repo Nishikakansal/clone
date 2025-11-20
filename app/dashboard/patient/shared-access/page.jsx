@@ -64,7 +64,103 @@ export default function SharedAccess() {
   useEffect(() => {
     fetchSharedAccess();
     fetchAccessRequests();
+    fetchHospitalsForDropdown();
   }, []);
+
+  const fetchHospitalsForDropdown = async () => {
+    try {
+      setLoadingHospitals(true);
+      const response = await fetch('/api/hospitals');
+      if (response.ok) {
+        const data = await response.json();
+        setHospitals(data.hospitals || []);
+      }
+    } catch (error) {
+      console.error('Error fetching hospitals:', error);
+      toast.error('Failed to load hospitals');
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
+  const fetchDoctorsForHospital = async (hospitalId) => {
+    try {
+      setLoadingDoctors(true);
+      setSelectedDoctor('');
+      const response = await fetch(`/api/hospitals/${hospitalId}/doctors`);
+      if (response.ok) {
+        const data = await response.json();
+        setDoctors(data.doctors || []);
+      }
+    } catch (error) {
+      console.error('Error fetching doctors:', error);
+      toast.error('Failed to load doctors for this hospital');
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  const handleHospitalChange = (hospitalId) => {
+    setSelectedHospital(hospitalId);
+    if (hospitalId) {
+      fetchDoctorsForHospital(hospitalId);
+    } else {
+      setDoctors([]);
+    }
+  };
+
+  const handleShareFromDropdown = async () => {
+    if (!selectedDoctor) {
+      toast.error('Please select a doctor');
+      return;
+    }
+
+    const doctor = doctors.find(d => d._id === selectedDoctor);
+    if (!doctor) {
+      toast.error('Doctor not found');
+      return;
+    }
+
+    setSharingFromDropdown(true);
+    try {
+      const response = await fetch('/api/auth/patient/shared-access', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          doctorId: doctor._id,
+          accessLevel: shareForm.accessLevel,
+          expiresIn: shareForm.expiresIn,
+          recordCategories: shareForm.recordCategories,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Access shared with Dr. ${doctor.firstName} ${doctor.lastName}. ${data.recordsUpdated} records updated.`);
+        setShowShareDialog(false);
+        setSelectedHospital('');
+        setSelectedDoctor('');
+        setDoctors([]);
+        setShareForm({
+          doctorEmail: '',
+          accessLevel: 'read',
+          expiresIn: '30d',
+          recordCategories: ['all'],
+        });
+        await fetchSharedAccess();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to share access');
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSharingFromDropdown(false);
+    }
+  };
 
   const fetchSharedAccess = async () => {
     try {
