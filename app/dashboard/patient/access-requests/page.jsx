@@ -34,7 +34,7 @@ export default function PatientAccessRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [responseDialog, setResponseDialog] = useState(null);
@@ -85,7 +85,9 @@ export default function PatientAccessRequests() {
         action,
       };
 
-      if (action === 'deny') {
+      if (action === 'approve') {
+        payload.durationDays = parseInt(durationDays, 10);
+      } else if (action === 'deny') {
         payload.responseMessage = rejectionReason || 'Access declined';
       }
 
@@ -149,7 +151,7 @@ export default function PatientAccessRequests() {
     const matchesSearch = `${req.doctor.name} ${req.doctor.email} ${req.doctor.specialization}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || req.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -191,7 +193,7 @@ export default function PatientAccessRequests() {
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Requests</SelectItem>
+                  <SelectItem value="all">All Requests</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
@@ -269,7 +271,14 @@ export default function PatientAccessRequests() {
 
                           {request.status === 'pending' && (
                             <div className="flex gap-2">
-                              <Dialog>
+                              <Dialog open={responseDialog === 'approve'} onOpenChange={(open) => {
+                                if (!open) {
+                                  setResponseDialog(null);
+                                  setSelectedRequest(null);
+                                  setDurationDays('30');
+                                  setAddToTrusted(false);
+                                }
+                              }}>
                                 <DialogTrigger asChild>
                                   <Button
                                     size="sm"
@@ -342,7 +351,13 @@ export default function PatientAccessRequests() {
                                 </DialogContent>
                               </Dialog>
 
-                              <Dialog>
+                              <Dialog open={responseDialog === 'reject'} onOpenChange={(open) => {
+                                if (!open) {
+                                  setResponseDialog(null);
+                                  setSelectedRequest(null);
+                                  setRejectionReason('');
+                                }
+                              }}>
                                 <DialogTrigger asChild>
                                   <Button
                                     size="sm"

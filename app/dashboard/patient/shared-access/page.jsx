@@ -27,7 +27,8 @@ import {
   Building,
   Mail,
   FileText,
-  Building2
+  Building2,
+  Stethoscope
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -40,6 +41,19 @@ export default function SharedAccess() {
   const [shareDialogTab, setShareDialogTab] = useState('hospital');
   const [searchTerm, setSearchTerm] = useState('');
   const [sharingAccess, setSharingAccess] = useState(false);
+  const [respondingToRequest, setRespondingToRequest] = useState(null);
+  const [durationDays, setDurationDays] = useState('30');
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [selectedRequestForApprove, setSelectedRequestForApprove] = useState(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [selectedAccessDetails, setSelectedAccessDetails] = useState(null);
+  const [hospitals, setHospitals] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [selectedHospital, setSelectedHospital] = useState('');
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [sharingFromDropdown, setSharingFromDropdown] = useState(false);
 
   const [shareForm, setShareForm] = useState({
     doctorEmail: '',
@@ -51,7 +65,103 @@ export default function SharedAccess() {
   useEffect(() => {
     fetchSharedAccess();
     fetchAccessRequests();
+    fetchHospitalsForDropdown();
   }, []);
+
+  const fetchHospitalsForDropdown = async () => {
+    try {
+      setLoadingHospitals(true);
+      const response = await fetch('/api/hospitals');
+      if (response.ok) {
+        const data = await response.json();
+        setHospitals(data.hospitals || []);
+      }
+    } catch (error) {
+      console.error('Error fetching hospitals:', error);
+      toast.error('Failed to load hospitals');
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
+  const fetchDoctorsForHospital = async (hospitalId) => {
+    try {
+      setLoadingDoctors(true);
+      setSelectedDoctor('');
+      const response = await fetch(`/api/hospitals/${hospitalId}/doctors`);
+      if (response.ok) {
+        const data = await response.json();
+        setDoctors(data.doctors || []);
+      }
+    } catch (error) {
+      console.error('Error fetching doctors:', error);
+      toast.error('Failed to load doctors for this hospital');
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  const handleHospitalChange = (hospitalId) => {
+    setSelectedHospital(hospitalId);
+    if (hospitalId) {
+      fetchDoctorsForHospital(hospitalId);
+    } else {
+      setDoctors([]);
+    }
+  };
+
+  const handleShareFromDropdown = async () => {
+    if (!selectedDoctor) {
+      toast.error('Please select a doctor');
+      return;
+    }
+
+    const doctor = doctors.find(d => d._id === selectedDoctor);
+    if (!doctor) {
+      toast.error('Doctor not found');
+      return;
+    }
+
+    setSharingFromDropdown(true);
+    try {
+      const response = await fetch('/api/auth/patient/shared-access', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          doctorId: doctor._id,
+          accessLevel: shareForm.accessLevel,
+          expiresIn: shareForm.expiresIn,
+          recordCategories: shareForm.recordCategories,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Access shared with Dr. ${doctor.firstName} ${doctor.lastName}. ${data.recordsUpdated} records updated.`);
+        setShowShareDialog(false);
+        setSelectedHospital('');
+        setSelectedDoctor('');
+        setDoctors([]);
+        setShareForm({
+          doctorEmail: '',
+          accessLevel: 'read',
+          expiresIn: '30d',
+          recordCategories: ['all'],
+        });
+        await fetchSharedAccess();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to share access');
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSharingFromDropdown(false);
+    }
+  };
 
   const fetchSharedAccess = async () => {
     try {
@@ -128,28 +238,43 @@ export default function SharedAccess() {
     }
   };
 
-  const handleAccessRequest = async (requestId, action) => {
+  const handleAccessRequest = async (requestId, action, duration = null) => {
+    setRespondingToRequest(requestId);
     try {
+      const payload = { action };
+
+      if (action === 'approve' && duration) {
+        payload.durationDays = parseInt(duration, 10);
+      }
+
       const response = await fetch(`/api/auth/patient/access-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        toast.success(`Access request ${action}ed`);
-        fetchAccessRequests();
-        fetchSharedAccess();
+        toast.success(`Access request ${action === 'approve' ? 'approved' : 'denied'} successfully`);
+        setShowApproveDialog(false);
+        setSelectedRequestForApprove(null);
+        setDurationDays('30');
+        await fetchAccessRequests();
+        await fetchSharedAccess();
       } else {
-        throw new Error(`Failed to ${action} request`);
+        const error = await response.json();
+        throw new Error(error.error || `Failed to ${action} request`);
       }
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setRespondingToRequest(null);
     }
   };
+
+  const pendingRequests = accessRequests.filter(req => req.status === 'pending');
 
   const revokeAccess = async (accessId, doctorName) => {
     if (!confirm(`Are you sure you want to revoke access for ${doctorName}? This will remove their access to all your medical records.`)) {
@@ -247,13 +372,147 @@ export default function SharedAccess() {
               </TabsList>
 
               <TabsContent value="hospital" className="space-y-4">
-                <HospitalDoctorSelector
-                  onDoctorSelected={() => {
-                    setShowShareDialog(false);
-                    fetchSharedAccess();
-                  }}
-                  onCancel={() => setShowShareDialog(false)}
-                />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hospital">Select Hospital</Label>
+                    <Select
+                      value={selectedHospital}
+                      onValueChange={handleHospitalChange}
+                      disabled={loadingHospitals}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingHospitals ? "Loading hospitals..." : "Choose a hospital"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hospitals.map((hospital) => (
+                          <SelectItem key={hospital._id} value={hospital._id}>
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4" />
+                              <span>{hospital.name}</span>
+                              {hospital.address?.city && (
+                                <span className="text-xs text-muted-foreground">({hospital.address.city})</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedHospital && (
+                    <div className="space-y-2">
+                      <Label htmlFor="doctor">Select Doctor</Label>
+                      <Select
+                        value={selectedDoctor}
+                        onValueChange={setSelectedDoctor}
+                        disabled={loadingDoctors || doctors.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingDoctors ? "Loading doctors..." : (doctors.length === 0 ? "No doctors available" : "Choose a doctor")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {doctors.map((doctor) => (
+                            <SelectItem key={doctor._id} value={doctor._id}>
+                              <div className="flex items-center gap-2">
+                                <Stethoscope className="h-4 w-4" />
+                                <span>Dr. {doctor.firstName} {doctor.lastName}</span>
+                                {doctor.specialization && (
+                                  <span className="text-xs text-muted-foreground">({doctor.specialization})</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedDoctor && (
+                        <div className="text-xs text-muted-foreground">
+                          <div className="mt-2 p-2 bg-muted rounded">
+                            {(() => {
+                              const doctor = doctors.find(d => d._id === selectedDoctor);
+                              return doctor ? (
+                                <>
+                                  <p><strong>Email:</strong> {doctor.email}</p>
+                                  <p><strong>License:</strong> {doctor.licenseNumber || 'N/A'}</p>
+                                </>
+                              ) : null;
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedDoctor && (
+                    <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <CardContent className="p-4">
+                        <p className="text-sm font-medium mb-4">Access Settings</p>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="accessLevel">Access Level</Label>
+                            <Select
+                              value={shareForm.accessLevel}
+                              onValueChange={(value) => setShareForm({ ...shareForm, accessLevel: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="read">Read Only</SelectItem>
+                                <SelectItem value="write">Read & Write</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="expiresIn">Access Duration</Label>
+                            <Select
+                              value={shareForm.expiresIn}
+                              onValueChange={(value) => setShareForm({ ...shareForm, expiresIn: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="7d">7 Days</SelectItem>
+                                <SelectItem value="30d">30 Days</SelectItem>
+                                <SelectItem value="90d">90 Days</SelectItem>
+                                <SelectItem value="1y">1 Year</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowShareDialog(false);
+                        setSelectedHospital('');
+                        setSelectedDoctor('');
+                        setDoctors([]);
+                      }}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleShareFromDropdown}
+                      disabled={!selectedDoctor || sharingFromDropdown}
+                      className="flex-1"
+                    >
+                      {sharingFromDropdown ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sharing...
+                        </>
+                      ) : (
+                        'Share Access'
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="email">
@@ -329,65 +588,133 @@ export default function SharedAccess() {
       </div>
 
       {/* Access Requests */}
-      {accessRequests.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Pending Access Requests
-            </CardTitle>
-            <CardDescription>
-              Doctors requesting access to your medical records
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {accessRequests.map((request) => (
-                <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <h4 className="font-semibold">{request.doctor.name}</h4>
-                      <Badge variant="outline">{request.doctor.specialization}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{request.doctor.email}</p>
-                    <p className="text-sm">{request.reason}</p>
-                    <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                      <span>
-                        Requested:{' '}
-                        {request?.requestedAt
-                          ? new Date(request.requestedAt).toLocaleDateString()
-                          : 'N/A'}
-                      </span>
-                      {request?.accessLevel && (
-                        <Badge className={getAccessLevelColor(request.accessLevel)}>
-                          {request.accessLevel}
-                        </Badge>
-                      )}
-                    </div>
+      {pendingRequests.length > 0 && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="mr-2 h-5 w-5" />
+                Pending Access Requests
+              </CardTitle>
+              <CardDescription>
+                Doctors requesting access to your medical records
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {pendingRequests.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-semibold">{request.doctor.name}</h4>
+                        <Badge variant="outline">{request.doctor.specialization}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{request.doctor.email}</p>
+                      <p className="text-sm">{request.reason}</p>
+                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                        <span>
+                          Requested:{' '}
+                          {request?.requestedAt
+                            ? new Date(request.requestedAt).toLocaleDateString()
+                            : 'N/A'}
+                        </span>
+                        {request?.accessLevel && (
+                          <Badge className={getAccessLevelColor(request.accessLevel)}>
+                            {request.accessLevel}
+                          </Badge>
+                        )}
+                      </div>
 
+                    </div>
+                    <div className="flex space-x-2">
+                      <Dialog open={showApproveDialog && selectedRequestForApprove?.id === request.id} onOpenChange={(open) => {
+                        if (!open) {
+                          setShowApproveDialog(false);
+                          setSelectedRequestForApprove(null);
+                          setDurationDays('30');
+                        }
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRequestForApprove(request);
+                              setShowApproveDialog(true);
+                            }}
+                            disabled={respondingToRequest === request.id}
+                          >
+                            <CheckCircle className="mr-1 h-4 w-4" />
+                            Approve
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Approve Access Request</DialogTitle>
+                            <DialogDescription>
+                              Grant {request.doctor.name} access to your medical records
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="approve-duration">Access Duration (days)</Label>
+                              <Select value={durationDays} onValueChange={setDurationDays}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="7">7 Days</SelectItem>
+                                  <SelectItem value="30">30 Days</SelectItem>
+                                  <SelectItem value="90">90 Days</SelectItem>
+                                  <SelectItem value="365">1 Year</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setShowApproveDialog(false);
+                                  setSelectedRequestForApprove(null);
+                                  setDurationDays('30');
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => handleAccessRequest(request.id, 'approve', durationDays)}
+                                disabled={respondingToRequest === request.id}
+                              >
+                                {respondingToRequest === request.id && (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                )}
+                                Approve Access
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAccessRequest(request.id, 'deny')}
+                        disabled={respondingToRequest === request.id}
+                      >
+                        {respondingToRequest === request.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <XCircle className="mr-1 h-4 w-4" />
+                        )}
+                        Deny
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleAccessRequest(request.id, 'approve')}
-                    >
-                      <CheckCircle className="mr-1 h-4 w-4" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAccessRequest(request.id, 'deny')}
-                    >
-                      <XCircle className="mr-1 h-4 w-4" />
-                      Deny
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Search */}
@@ -468,10 +795,151 @@ export default function SharedAccess() {
                   </div>
 
                   <div className="flex space-x-2 ml-4">
-                    <Button size="sm" variant="outline">
-                      <Eye className="mr-1 h-4 w-4" />
-                      View Details
-                    </Button>
+                    <Dialog open={showDetailsDialog && selectedAccessDetails?.id === access.id} onOpenChange={(open) => {
+                      if (!open) {
+                        setShowDetailsDialog(false);
+                        setSelectedAccessDetails(null);
+                      }
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedAccessDetails(access);
+                            setShowDetailsDialog(true);
+                          }}
+                        >
+                          <Eye className="mr-1 h-4 w-4" />
+                          View Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                          <DialogTitle>Doctor Access Details</DialogTitle>
+                          <DialogDescription>
+                            Complete information about {access.doctor.name}'s access
+                          </DialogDescription>
+                        </DialogHeader>
+                        {selectedAccessDetails && (
+                          <div className="space-y-6">
+                            {/* Doctor Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Doctor Information</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Name:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.name}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Email:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.email}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Specialization:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.specialization}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Hospital/Clinic:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.hospital}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Access Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Access Information</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Status:</span>
+                                    <Badge className={getStatusColor(selectedAccessDetails.status)}>
+                                      {selectedAccessDetails.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Level:</span>
+                                    <Badge className={getAccessLevelColor(selectedAccessDetails.accessLevel)}>
+                                      {selectedAccessDetails.accessLevel === 'read' ? 'View Only' : 'View & Edit'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Records Accessible:</span>
+                                    <span className="text-sm">{selectedAccessDetails.recordCount}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Timeline Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Timeline</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Granted:</span>
+                                    <span className="text-sm">{new Date(selectedAccessDetails.grantedAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Expires:</span>
+                                    <span className="text-sm">
+                                      {selectedAccessDetails.expiresAt
+                                        ? new Date(selectedAccessDetails.expiresAt).toLocaleDateString()
+                                        : 'No expiration'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Record Categories */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Record Categories</h3>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {selectedAccessDetails.recordCategories && selectedAccessDetails.recordCategories.length > 0 ? (
+                                    selectedAccessDetails.recordCategories.map((category, idx) => (
+                                      <Badge key={idx} variant="secondary">
+                                        {category === 'all' ? 'All Records' : category.replace('-', ' ')}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">All record types</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-4">
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setShowDetailsDialog(false);
+                                  setSelectedAccessDetails(null);
+                                }}
+                              >
+                                Close
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                className="flex-1"
+                                onClick={() => {
+                                  setShowDetailsDialog(false);
+                                  revokeAccess(selectedAccessDetails.id, selectedAccessDetails.doctor.name);
+                                  setSelectedAccessDetails(null);
+                                }}
+                              >
+                                Revoke Access
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                     <Button
                       size="sm"
                       variant="destructive"
