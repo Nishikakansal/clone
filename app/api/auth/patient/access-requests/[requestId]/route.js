@@ -57,7 +57,8 @@ export async function PATCH(request, { params }) {
 
     // If approved, grant access
     if (action === "approve") {
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const days = durationDays || 30;
+      const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
       accessRequest.expiresAt = expiresAt;
 
       const recordCategories = accessRequest.recordCategories.includes("all")
