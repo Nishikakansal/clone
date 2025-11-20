@@ -46,6 +46,13 @@ export default function SharedAccess() {
   const [selectedRequestForApprove, setSelectedRequestForApprove] = useState(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [selectedAccessDetails, setSelectedAccessDetails] = useState(null);
+  const [hospitals, setHospitals] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [selectedHospital, setSelectedHospital] = useState('');
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [sharingFromDropdown, setSharingFromDropdown] = useState(false);
 
   const [shareForm, setShareForm] = useState({
     doctorEmail: '',
