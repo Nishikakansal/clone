@@ -557,10 +557,151 @@ export default function SharedAccess() {
                   </div>
 
                   <div className="flex space-x-2 ml-4">
-                    <Button size="sm" variant="outline">
-                      <Eye className="mr-1 h-4 w-4" />
-                      View Details
-                    </Button>
+                    <Dialog open={showDetailsDialog && selectedAccessDetails?.id === access.id} onOpenChange={(open) => {
+                      if (!open) {
+                        setShowDetailsDialog(false);
+                        setSelectedAccessDetails(null);
+                      }
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedAccessDetails(access);
+                            setShowDetailsDialog(true);
+                          }}
+                        >
+                          <Eye className="mr-1 h-4 w-4" />
+                          View Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                          <DialogTitle>Doctor Access Details</DialogTitle>
+                          <DialogDescription>
+                            Complete information about {access.doctor.name}'s access
+                          </DialogDescription>
+                        </DialogHeader>
+                        {selectedAccessDetails && (
+                          <div className="space-y-6">
+                            {/* Doctor Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Doctor Information</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Name:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.name}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Email:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.email}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Specialization:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.specialization}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Hospital/Clinic:</span>
+                                    <span className="text-sm">{selectedAccessDetails.doctor.hospital}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Access Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Access Information</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Status:</span>
+                                    <Badge className={getStatusColor(selectedAccessDetails.status)}>
+                                      {selectedAccessDetails.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Level:</span>
+                                    <Badge className={getAccessLevelColor(selectedAccessDetails.accessLevel)}>
+                                      {selectedAccessDetails.accessLevel === 'read' ? 'View Only' : 'View & Edit'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Records Accessible:</span>
+                                    <span className="text-sm">{selectedAccessDetails.recordCount}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Timeline Information */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Timeline</h3>
+                                <div className="mt-2 space-y-3">
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Access Granted:</span>
+                                    <span className="text-sm">{new Date(selectedAccessDetails.grantedAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-sm font-medium">Expires:</span>
+                                    <span className="text-sm">
+                                      {selectedAccessDetails.expiresAt
+                                        ? new Date(selectedAccessDetails.expiresAt).toLocaleDateString()
+                                        : 'No expiration'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Record Categories */}
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-muted-foreground">Record Categories</h3>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {selectedAccessDetails.recordCategories && selectedAccessDetails.recordCategories.length > 0 ? (
+                                    selectedAccessDetails.recordCategories.map((category, idx) => (
+                                      <Badge key={idx} variant="secondary">
+                                        {category === 'all' ? 'All Records' : category.replace('-', ' ')}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">All record types</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-4">
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => {
+                                  setShowDetailsDialog(false);
+                                  setSelectedAccessDetails(null);
+                                }}
+                              >
+                                Close
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                className="flex-1"
+                                onClick={() => {
+                                  setShowDetailsDialog(false);
+                                  revokeAccess(selectedAccessDetails.id, selectedAccessDetails.doctor.name);
+                                  setSelectedAccessDetails(null);
+                                }}
+                              >
+                                Revoke Access
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                     <Button
                       size="sm"
                       variant="destructive"
