@@ -175,13 +175,13 @@ export default function DoctorAccessRequests() {
 
   const startEdit = (request) => {
     setRequestForm({
-      patientEmail: request.patientEmail,
-      reason: request.reason,
-      accessLevel: request.accessLevel,
-      recordCategories: request.recordCategories,
-      urgency: request.urgency,
+      patientEmail: request.patientEmail || '',
+      reason: request.reason || '',
+      accessLevel: request.accessLevel || 'read',
+      recordCategories: request.recordCategories || ['all'],
+      urgency: request.urgency || 'routine',
     });
-    setEditingRequest(request.id);
+    setEditingRequest(request.id || request._id);
     setShowRequestDialog(true);
   };
 
