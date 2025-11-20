@@ -269,7 +269,14 @@ export default function PatientAccessRequests() {
 
                           {request.status === 'pending' && (
                             <div className="flex gap-2">
-                              <Dialog>
+                              <Dialog open={responseDialog === 'approve'} onOpenChange={(open) => {
+                                if (!open) {
+                                  setResponseDialog(null);
+                                  setSelectedRequest(null);
+                                  setDurationDays('30');
+                                  setAddToTrusted(false);
+                                }
+                              }}>
                                 <DialogTrigger asChild>
                                   <Button
                                     size="sm"
@@ -342,7 +349,13 @@ export default function PatientAccessRequests() {
                                 </DialogContent>
                               </Dialog>
 
-                              <Dialog>
+                              <Dialog open={responseDialog === 'reject'} onOpenChange={(open) => {
+                                if (!open) {
+                                  setResponseDialog(null);
+                                  setSelectedRequest(null);
+                                  setRejectionReason('');
+                                }
+                              }}>
                                 <DialogTrigger asChild>
                                   <Button
                                     size="sm"
