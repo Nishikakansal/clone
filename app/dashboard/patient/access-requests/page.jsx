@@ -85,7 +85,9 @@ export default function PatientAccessRequests() {
         action,
       };
 
-      if (action === 'deny') {
+      if (action === 'approve') {
+        payload.durationDays = parseInt(durationDays, 10);
+      } else if (action === 'deny') {
         payload.responseMessage = rejectionReason || 'Access declined';
       }
 
