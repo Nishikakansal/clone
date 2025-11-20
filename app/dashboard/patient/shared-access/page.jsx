@@ -348,65 +348,133 @@ export default function SharedAccess() {
       </div>
 
       {/* Access Requests */}
-      {accessRequests.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Pending Access Requests
-            </CardTitle>
-            <CardDescription>
-              Doctors requesting access to your medical records
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {accessRequests.map((request) => (
-                <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <h4 className="font-semibold">{request.doctor.name}</h4>
-                      <Badge variant="outline">{request.doctor.specialization}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{request.doctor.email}</p>
-                    <p className="text-sm">{request.reason}</p>
-                    <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                      <span>
-                        Requested:{' '}
-                        {request?.requestedAt
-                          ? new Date(request.requestedAt).toLocaleDateString()
-                          : 'N/A'}
-                      </span>
-                      {request?.accessLevel && (
-                        <Badge className={getAccessLevelColor(request.accessLevel)}>
-                          {request.accessLevel}
-                        </Badge>
-                      )}
-                    </div>
+      {pendingRequests.length > 0 && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Clock className="mr-2 h-5 w-5" />
+                Pending Access Requests
+              </CardTitle>
+              <CardDescription>
+                Doctors requesting access to your medical records
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {pendingRequests.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-semibold">{request.doctor.name}</h4>
+                        <Badge variant="outline">{request.doctor.specialization}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{request.doctor.email}</p>
+                      <p className="text-sm">{request.reason}</p>
+                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                        <span>
+                          Requested:{' '}
+                          {request?.requestedAt
+                            ? new Date(request.requestedAt).toLocaleDateString()
+                            : 'N/A'}
+                        </span>
+                        {request?.accessLevel && (
+                          <Badge className={getAccessLevelColor(request.accessLevel)}>
+                            {request.accessLevel}
+                          </Badge>
+                        )}
+                      </div>
 
+                    </div>
+                    <div className="flex space-x-2">
+                      <Dialog open={showApproveDialog && selectedRequestForApprove?.id === request.id} onOpenChange={(open) => {
+                        if (!open) {
+                          setShowApproveDialog(false);
+                          setSelectedRequestForApprove(null);
+                          setDurationDays('30');
+                        }
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRequestForApprove(request);
+                              setShowApproveDialog(true);
+                            }}
+                            disabled={respondingToRequest === request.id}
+                          >
+                            <CheckCircle className="mr-1 h-4 w-4" />
+                            Approve
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Approve Access Request</DialogTitle>
+                            <DialogDescription>
+                              Grant {request.doctor.name} access to your medical records
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="approve-duration">Access Duration (days)</Label>
+                              <Select value={durationDays} onValueChange={setDurationDays}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="7">7 Days</SelectItem>
+                                  <SelectItem value="30">30 Days</SelectItem>
+                                  <SelectItem value="90">90 Days</SelectItem>
+                                  <SelectItem value="365">1 Year</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setShowApproveDialog(false);
+                                  setSelectedRequestForApprove(null);
+                                  setDurationDays('30');
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => handleAccessRequest(request.id, 'approve', durationDays)}
+                                disabled={respondingToRequest === request.id}
+                              >
+                                {respondingToRequest === request.id && (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                )}
+                                Approve Access
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAccessRequest(request.id, 'deny')}
+                        disabled={respondingToRequest === request.id}
+                      >
+                        {respondingToRequest === request.id ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <XCircle className="mr-1 h-4 w-4" />
+                        )}
+                        Deny
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleAccessRequest(request.id, 'approve')}
-                    >
-                      <CheckCircle className="mr-1 h-4 w-4" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAccessRequest(request.id, 'deny')}
-                    >
-                      <XCircle className="mr-1 h-4 w-4" />
-                      Deny
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Search */}
