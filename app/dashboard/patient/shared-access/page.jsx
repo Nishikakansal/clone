@@ -132,28 +132,43 @@ export default function SharedAccess() {
     }
   };
 
-  const handleAccessRequest = async (requestId, action) => {
+  const handleAccessRequest = async (requestId, action, duration = null) => {
+    setRespondingToRequest(requestId);
     try {
+      const payload = { action };
+
+      if (action === 'approve' && duration) {
+        payload.durationDays = parseInt(duration, 10);
+      }
+
       const response = await fetch(`/api/auth/patient/access-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        toast.success(`Access request ${action}ed`);
-        fetchAccessRequests();
-        fetchSharedAccess();
+        toast.success(`Access request ${action === 'approve' ? 'approved' : 'denied'} successfully`);
+        setShowApproveDialog(false);
+        setSelectedRequestForApprove(null);
+        setDurationDays('30');
+        await fetchAccessRequests();
+        await fetchSharedAccess();
       } else {
-        throw new Error(`Failed to ${action} request`);
+        const error = await response.json();
+        throw new Error(error.error || `Failed to ${action} request`);
       }
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setRespondingToRequest(null);
     }
   };
+
+  const pendingRequests = accessRequests.filter(req => req.status === 'pending');
 
   const revokeAccess = async (accessId, doctorName) => {
     if (!confirm(`Are you sure you want to revoke access for ${doctorName}? This will remove their access to all your medical records.`)) {
