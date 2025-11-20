@@ -34,9 +34,9 @@ export async function GET(request) {
       accessLevel: r.accessLevel,
       recordCategories: r.recordCategories,
       status: r.status,
-      approvedAt: r.respondedAt,
-      rejectedAt: r.respondedAt,
-      rejectionReason: r.responseMessage,
+      approvedAt: r.status === 'approved' ? r.respondedAt : null,
+      rejectedAt: r.status === 'denied' ? r.respondedAt : null,
+      rejectionReason: r.status === 'denied' ? r.responseMessage : null,
       expiresAt: r.expiresAt,
     }));
 
